@@ -1,0 +1,39 @@
+{
+    "name": "rhaima96/laravel-vector-metrics",
+    "description": "Euclidean and cosine vector distance queries and indexes for Laravel on MariaDB and Postgres.",
+    "keywords": ["laravel", "mariadb", "pgvector", "vector", "embeddings"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mohamed Touhami Rhaima"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/database": "^13.0",
+        "illuminate/support": "^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "phpunit/phpunit": "^12.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Rhaima96\\VectorMetrics\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Rhaima96\\VectorMetrics\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Rhaima96\\VectorMetrics\\VectorMetricsServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
