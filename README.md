@@ -60,6 +60,30 @@ Document::query()
 
 > On MariaDB, a vector index is only used when the query's distance function matches the index's `DISTANCE`. Create the index with the same metric you query with.
 
+### How the query vector is sent
+
+On Postgres the vector is a bound parameter (`?`). On MariaDB it is written into the SQL as a binary
+literal (`x'…'`, float32 little-endian), not as `vec_fromtext(?)`. The literal is built from floats only.
+
+The reason is measured: MariaDB converts a constant `vec_fromtext()` again for every row when it appears
+in the select list or in `ORDER BY` ([MDEV-42201](https://jira.mariadb.org/browse/MDEV-42201)). On a
+laptop with MariaDB 12.3.3 and 768-dimension vectors:
+
+| Query | `vec_fromtext(?)` | binary literal |
+| --- | --- | --- |
+| Exact search, no vector index, 20,000 rows | about 950 ms | about 24 ms |
+| Exact search, no vector index, 50,000 rows | 2,725 ms | 58 ms |
+| With a vector index (`M=16`), 50,000 rows | 2.6 ms | 0.7 ms |
+
+Same rows returned in both forms. One machine, one client; your numbers will differ.
+
+### Choosing `M`
+
+`M` trades build time for recall. On 50,000 real text passages (768 dimensions), at MariaDB's default
+search effort (`mhnsw_ef_search=20`), recall@10 was 83 to 86% with the default `M=6` and 99 to 100% with
+`M=16`, at about the same query time. Building the index took about 3 to 4 times longer with `M=16`. Two runs
+on one laptop: measure on your own data before choosing.
+
 ## Testing
 
 ```bash

@@ -23,8 +23,9 @@ class VectorMetricsTest extends TestCase
     public static function queries(): array
     {
         return [
-            'mariadb euclidean' => [MariaDbConnection::class, 'euclidean', 'vec_distance_euclidean(`embedding`, vec_fromtext(?))'],
-            'mariadb cosine' => [MariaDbConnection::class, 'cosine', 'vec_distance_cosine(`embedding`, vec_fromtext(?))'],
+            // %s = hex of the query vector as float32 little-endian
+            'mariadb euclidean' => [MariaDbConnection::class, 'euclidean', "vec_distance_euclidean(`embedding`, x'%s')"],
+            'mariadb cosine' => [MariaDbConnection::class, 'cosine', "vec_distance_cosine(`embedding`, x'%s')"],
             'pgsql euclidean' => [PostgresConnection::class, 'euclidean', '("embedding" <-> ?)'],
             'pgsql cosine' => [PostgresConnection::class, 'cosine', '("embedding" <=> ?)'],
         ];
@@ -40,13 +41,19 @@ class VectorMetricsTest extends TestCase
             ->orWhereVectorDistanceUsing($metric, 'embedding', [4, 5, 6], 0.25)
             ->orderByVectorDistanceUsing($metric, 'embedding', collect([1, 2, 3]));
 
-        $wrap = fn ($value) => $connection === MariaDbConnection::class ? "`{$value}`" : "\"{$value}\"";
+        $mariadb = $connection === MariaDbConnection::class;
+        $wrap = fn ($value) => $mariadb ? "`{$value}`" : "\"{$value}\"";
+        $d123 = sprintf($distance, '0000803f0000004000004040'); // [1, 2, 3]
+        $d456 = sprintf($distance, '000080400000a0400000c040'); // [4, 5, 6]
 
         $this->assertSame(
-            "select {$distance} as {$wrap('embedding_distance')} from {$wrap('documents')} where {$distance} <= ? or {$distance} <= ? order by {$distance} asc",
+            "select {$d123} as {$wrap('embedding_distance')} from {$wrap('documents')} where {$d123} <= ? or {$d456} <= ? order by {$d123} asc",
             $query->toSql()
         );
-        $this->assertSame(['[1,2,3]', '[1,2,3]', 0.5, '[4,5,6]', 0.25, '[1,2,3]'], $query->getBindings());
+        $this->assertSame(
+            $mariadb ? [0.5, 0.25] : ['[1,2,3]', '[1,2,3]', 0.5, '[4,5,6]', 0.25, '[1,2,3]'],
+            $query->getBindings()
+        );
     }
 
     public function testMariaDbVectorIndex()

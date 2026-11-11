@@ -12,16 +12,16 @@ class VectorMetricsServiceProvider extends ServiceProvider
     {
         Builder::macro('selectVectorDistanceUsing', function (string $metric, string $column, $vector, ?string $as = null) {
             /** @var \Illuminate\Database\Query\Builder $this */
-            $sql = VectorMetric::distance($this->getGrammar(), $metric, $column);
+            [$sql, $bindings] = VectorMetric::distance($this->getGrammar(), $metric, $column, $vector);
 
-            return $this->selectRaw($sql.' as '.$this->getGrammar()->wrap($as ?? $column.'_distance'), [VectorMetric::encode($vector)]);
+            return $this->selectRaw($sql.' as '.$this->getGrammar()->wrap($as ?? $column.'_distance'), $bindings);
         });
 
         Builder::macro('whereVectorDistanceUsing', function (string $metric, string $column, $vector, float $maxDistance, string $boolean = 'and') {
             /** @var \Illuminate\Database\Query\Builder $this */
-            $sql = VectorMetric::distance($this->getGrammar(), $metric, $column);
+            [$sql, $bindings] = VectorMetric::distance($this->getGrammar(), $metric, $column, $vector);
 
-            return $this->whereRaw($sql.' <= ?', [VectorMetric::encode($vector), $maxDistance], $boolean);
+            return $this->whereRaw($sql.' <= ?', [...$bindings, $maxDistance], $boolean);
         });
 
         Builder::macro('orWhereVectorDistanceUsing', function (string $metric, string $column, $vector, float $maxDistance) {
@@ -31,9 +31,9 @@ class VectorMetricsServiceProvider extends ServiceProvider
 
         Builder::macro('orderByVectorDistanceUsing', function (string $metric, string $column, $vector) {
             /** @var \Illuminate\Database\Query\Builder $this */
-            $sql = VectorMetric::distance($this->getGrammar(), $metric, $column);
+            [$sql, $bindings] = VectorMetric::distance($this->getGrammar(), $metric, $column, $vector);
 
-            return $this->orderByRaw($sql.' asc', [VectorMetric::encode($vector)]);
+            return $this->orderByRaw($sql.' asc', $bindings);
         });
 
         // $m is MariaDB's graph degree (3–200) and is ignored on Postgres.

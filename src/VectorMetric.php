@@ -13,17 +13,11 @@ use RuntimeException;
 final class VectorMetric
 {
     /**
-     * The distance SQL for each driver and metric (%s is the wrapped column).
+     * The pgvector distance operator for each metric (%s is the wrapped column).
      */
-    private const DISTANCE = [
-        'mariadb' => [
-            'cosine' => 'vec_distance_cosine(%s, vec_fromtext(?))',
-            'euclidean' => 'vec_distance_euclidean(%s, vec_fromtext(?))',
-        ],
-        'pgsql' => [
-            'cosine' => '(%s <=> ?)',
-            'euclidean' => '(%s <-> ?)',
-        ],
+    private const PGSQL_DISTANCE = [
+        'cosine' => '(%s <=> ?)',
+        'euclidean' => '(%s <-> ?)',
     ];
 
     /**
@@ -35,17 +29,25 @@ final class VectorMetric
     ];
 
     /**
-     * Compile the distance expression for the given query grammar.
+     * Compile the distance expression and its bindings for the given query grammar.
+     *
+     * On MariaDB the query vector is written as a binary (float32 little-endian) hex literal instead of
+     * vec_fromtext(?): MariaDB converts a constant vec_fromtext() again for every row in the SELECT list
+     * and ORDER BY (MDEV-42201), which makes a scan of 20,000 rows about 40 times slower. The literal
+     * is built from floats only, so it cannot carry SQL.
+     *
+     * @return array{0: string, 1: array<int, string>}
      */
-    public static function distance(object $grammar, string $metric, string $column): string
+    public static function distance(object $grammar, string $metric, string $column, Arrayable|array $vector): array
     {
-        $driver = match (true) {
-            $grammar instanceof MariaDbGrammar => 'mariadb',
-            $grammar instanceof PostgresGrammar => 'pgsql',
+        $metric = self::validate($metric);
+        $column = $grammar->wrap($column);
+
+        return match (true) {
+            $grammar instanceof MariaDbGrammar => ["vec_distance_{$metric}({$column}, x'".self::hex($vector)."')", []],
+            $grammar instanceof PostgresGrammar => [sprintf(self::PGSQL_DISTANCE[$metric], $column), [self::encode($vector)]],
             default => throw new RuntimeException('Vector distance metrics are only supported by MariaDB and Postgres.'),
         };
-
-        return sprintf(self::DISTANCE[$driver][self::validate($metric)], $grammar->wrap($column));
     }
 
     /**
@@ -70,6 +72,16 @@ final class VectorMetric
     public static function encode(Arrayable|array $vector): string
     {
         return json_encode($vector instanceof Arrayable ? $vector->toArray() : $vector, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Encode the vector as hex float32 little-endian, MariaDB's binary vector format.
+     */
+    public static function hex(Arrayable|array $vector): string
+    {
+        $values = array_map('floatval', array_values($vector instanceof Arrayable ? $vector->toArray() : $vector));
+
+        return bin2hex(pack('g*', ...$values));
     }
 
     private static function validate(string $metric): string
