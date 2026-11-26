@@ -80,7 +80,7 @@ Same rows returned in both forms. One machine, one client; your numbers will dif
 ### Choosing `M`
 
 `M` trades build time for recall. On 50,000 real text passages (768 dimensions), at MariaDB's default
-search effort (`mhnsw_ef_search=20`), recall@10 was 83 to 86% with the default `M=6` and 99 to 100% with
+search effort (`mhnsw_ef_search=20`), recall@10 was 82 to 86% with the default `M=6` and 99 to 100% with
 `M=16`, at about the same query time. Building the index took about 3 to 4 times longer with `M=16`. Two runs
 on one laptop: measure on your own data before choosing.
 
